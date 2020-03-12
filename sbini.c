@@ -1,6 +1,8 @@
 /**
 * sbini -- a general purpose ini file reader/writer
 * This file is released into the public domain
+*
+* Written by Saxon Bell
 */
 
 #include "sbini.h"
@@ -18,6 +20,8 @@
                                                   cp++; \
                                                 }
 
+#define SBINI_BOOLEAN_STRING(b) b?"true":"false"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,8 +34,11 @@
 sbini_t *sbini__internal_create_ini (void);
 sbini_group_t *sbini__internal_add_group (sbini_t *ini, const char *name);
 sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name);
+sbini_group_t *sbini__internal_find_or_add_group (sbini_t *ini, const char *name);
 sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, const char *value, const int string_val);
 sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group, const char *key);
+sbini_item_t *sbin__internal_find_item_in_group (sbini_group_t *group, const char *key);
+sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const char *key, const char *value, const int str_value);
 
 /** PUBLIC FUNCTION DEFINITIONS **/
 
@@ -149,6 +156,8 @@ int sbini_load (const char *file_path, sbini_t *ini)
   return return_val;
 }
 
+/* GETTERS */
+
 int sbini_get_int (sbini_t *ini, const char *group, const char *key)
 {
   sbini_item_t *item;
@@ -162,7 +171,7 @@ int sbini_get_int (sbini_t *ini, const char *group, const char *key)
   return atoi(item->value);
 }
 
-double sbini_get_float (sbini_t *ini, const char *group, const char *key)
+float sbini_get_float (sbini_t *ini, const char *group, const char *key)
 {
   sbini_item_t *item;
 
@@ -172,7 +181,7 @@ double sbini_get_float (sbini_t *ini, const char *group, const char *key)
     return 0;
   }
 
-  return atof(item->value);
+  return (float)atof(item->value);
 }
 
 const char *sbini_get_string (sbini_t *ini, const char *group, const char *key)
@@ -199,6 +208,98 @@ int sbini_get_boolean (sbini_t *ini, const char *group, const char *key)
   }
 
   return (strncasecmp(item->value, "true", 4) == 0);
+}
+
+/* SETTERS */
+
+int sbini_set_boolean (sbini_t *ini, const char *group_name, const char *key, const int value)
+{
+  sbini_group_t *group;
+  sbini_item_t *item;
+  char str_value[SBINI_MAX_KEY_VALUE_LENGTH];
+
+  group = sbini__internal_find_or_add_group(ini, group_name);
+
+  if (!group) {
+    return -1;
+  }
+
+  snprintf(str_value, SBINI_MAX_KEY_VALUE_LENGTH, "%s", SBINI_BOOLEAN_STRING(value));
+
+  item = sbini__internal_modify_or_add_item(group, key, str_value, 0);
+
+  if (!item) {
+    return -2;
+  }
+
+  return 0;
+}
+
+int sbini_set_int (sbini_t *ini, const char *group_name, const char *key, const int value)
+{
+  sbini_group_t *group;
+  sbini_item_t *item;
+  char str_value[SBINI_MAX_KEY_VALUE_LENGTH];
+
+  group = sbini__internal_find_or_add_group(ini, group_name);
+
+  if (!group) {
+    return -1;
+  }
+
+  snprintf(str_value, SBINI_MAX_KEY_VALUE_LENGTH, "%d", value);
+
+  item = sbini__internal_modify_or_add_item(group, key, str_value, 0);
+
+  if (!item) {
+    return -2;
+  }
+
+  return 0;
+}
+
+
+int sbini_set_float (sbini_t *ini, const char *group_name, const char *key, const float value)
+{
+  sbini_group_t *group;
+  sbini_item_t *item;
+  char str_value[SBINI_MAX_KEY_VALUE_LENGTH];
+
+  group = sbini__internal_find_or_add_group(ini, group_name);
+
+  if (!group) {
+    return -1;
+  }
+
+  snprintf(str_value, SBINI_MAX_KEY_VALUE_LENGTH, "%f",value);
+
+  item = sbini__internal_modify_or_add_item(group, key, str_value, 0);
+
+  if (!item) {
+    return -2;
+  }
+
+  return 0;
+}
+
+int sbini_set_string (sbini_t *ini, const char *group_name, const char *key, const char *value)
+{
+  sbini_group_t *group;
+  sbini_item_t *item;
+
+  group = sbini__internal_find_or_add_group(ini, group_name);
+
+  if (!group) {
+    return -1;
+  }
+
+  item = sbini__internal_modify_or_add_item(group, key, value, 1);
+
+  if (!item) {
+    return -2;
+  }
+
+  return 0; 
 }
 
 int sbini_save (sbini_t *ini, const char *file_path)
@@ -263,7 +364,9 @@ void sbini_free (sbini_t *ini)
   }
 }
 
-/** INTERNAL FUNCTION DEFINITIONS **/
+/*********************************************************************/
+/******************* INTERNAL FUNCTION DEFINITIONS *******************/
+/*********************************************************************/
 
 sbini_t *sbini__internal_create_ini (void)
 {
@@ -330,6 +433,23 @@ sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name)
   return NULL;
 }
 
+sbini_group_t *sbini__internal_find_or_add_group (sbini_t *ini, const char *name)
+{
+  sbini_group_t *group;
+
+  group = sbini__internal_find_group(ini, name);
+
+  if (!group) {
+    group = sbini__internal_add_group(ini, name);
+
+    if (!group) {
+      return NULL;
+    }
+  }
+
+  return group;
+}
+
 sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, const char *value, const int string_val)
 {
   sbini_item_t *item, *search;
@@ -390,3 +510,70 @@ sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group_name, c
 
   return NULL; // no such group;
 }
+
+sbini_item_t *sbin__internal_find_item_in_group (sbini_group_t *group, const char *key)
+{
+  sbini_item_t *item;
+
+  item = group->head;
+
+  while (item) {
+    if (strcmp(item->key, key) == 0) {
+      return item;
+    }
+
+    item = item->next;
+  }
+
+  return NULL;
+}
+
+sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const char *key, const char *value, const int str_value)
+{
+  sbini_item_t *item;
+
+  item = sbin__internal_find_item_in_group(group, key);
+
+  if (!item) {
+    item = sbini__internal_add_item(group, key, value, str_value);
+
+    if (!item) {
+      return NULL;
+    }
+  } else {
+    if (str_value) {
+      snprintf(item->value, SBINI_MAX_KEY_VALUE_LENGTH, "\"%s\"", value);
+    } else {
+      snprintf(item->value, SBINI_MAX_KEY_VALUE_LENGTH, "%s", value);
+    }
+  }
+
+  return item;
+}
+
+/*
+* This is free and unencumbered software released into the public domain.
+*
+* Anyone is free to copy, modify, publish, use, compile, sell, or
+* distribute this software, either in source code form or as a compiled
+* binary, for any purpose, commercial or non-commercial, and by any
+* means.
+*
+* In jurisdictions that recognize copyright laws, the author or authors
+* of this software dedicate any and all copyright interest in the
+* software to the public domain. We make this dedication for the benefit
+* of the public at large and to the detriment of our heirs and
+* successors. We intend this dedication to be an overt act of
+* relinquishment in perpetuity of all present and future rights to this
+* software under copyright law.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+* OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+* ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+* OTHER DEALINGS IN THE SOFTWARE.
+*
+* For more information, please refer to <http://unlicense.org/>
+*/
