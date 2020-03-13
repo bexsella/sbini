@@ -11,11 +11,11 @@
 #define SBINI_IS_WHITESPACE(c) (c == ' ' || c == '\t')
 #define SBINI_SKIP_WHITESPACE(cp) while (cp && SBINI_IS_WHITESPACE(*cp)) cp++
 #define SBINI_SEEK_CHAR(cp,c) while (cp && *cp != c) cp++
-#define SBINI_SEEK_CHAR_AND_WHITESPACE(cp,ws,c) while (cp && *cp != c) { \
-                                                  if (!ws && SBINI_IS_WHITESPACE(*cp)) { \
-                                                    ws = cp; \
-                                                  } else if (ws && !SBINI_IS_WHITESPACE(*cp)) { \
-                                                    ws = NULL; \
+#define SBINI_SEEK_CHAR_AND_WHITESPACE(cp,wsp,c) while (cp && *cp != c) { \
+                                                  if (!wsp && SBINI_IS_WHITESPACE(*cp)) { \
+                                                    wsp = cp; \
+                                                  } else if (wsp && !SBINI_IS_WHITESPACE(*cp)) { \
+                                                    wsp = NULL; \
                                                   } \
                                                   cp++; \
                                                 }
@@ -37,37 +37,38 @@ sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name);
 sbini_group_t *sbini__internal_find_or_add_group (sbini_t *ini, const char *name);
 sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, const char *value, const int string_val);
 sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group, const char *key);
-sbini_item_t *sbin__internal_find_item_in_group (sbini_group_t *group, const char *key);
+sbini_item_t *sbini__internal_find_item_in_group (sbini_group_t *group, const char *key);
 sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const char *key, const char *value, const int str_value);
 
 /** PUBLIC FUNCTION DEFINITIONS **/
 
-int sbini_load (const char *file_path, sbini_t *ini)
+sbini_t *sbini_new (void)
+{
+  return sbini__internal_create_ini();
+}
+
+sbini_t *sbini_load (const char *file_path)
 {
   FILE *fp;
   char line_buffer[SBINI_MAX_LINE_LENGTH];
   char *line, *ws, *str, *item_val;
   int string_val;
   int return_val = 0;
-  sbini_t *result = NULL;
+  sbini_t *ini;
   sbini_group_t *current_group = NULL;
   sbini_item_t *current_item = NULL;
 
   fp = fopen(file_path, "r");
 
   if (!fp) {
-    return -1;
+    return NULL;
   }
 
-  if (ini != NULL) {
-    memset(ini, 0, sizeof(sbini_t));
-    result = ini;
-  } else {
-    return -1;
-  }
+  ini = sbini__internal_create_ini();
 
-  if (!result) {
-    return -2;
+  if (!ini) {
+    fclose(fp);
+    return NULL;
   }
 
   while (fgets(line_buffer, SBINI_MAX_LINE_LENGTH, fp) != NULL) {
@@ -88,8 +89,8 @@ int sbini_load (const char *file_path, sbini_t *ini)
         }
 
         if (!current_group) {
-          return_val = -3;
-          break;
+          return_val = -1;
+          goto error_exit;
         }
       } else {
         /* READ KEY */
@@ -135,25 +136,28 @@ int sbini_load (const char *file_path, sbini_t *ini)
         }
 
         if (!current_group) {
-          return_val = -4;
-          break;
+          return_val = -2;
+          goto error_exit;
         }
 
         current_item = sbini__internal_add_item(current_group, str, item_val, string_val);
 
         if (!current_item) {
-          return_val = -5;
-          break;
+          return_val = -3;
+          goto error_exit;
         }
       }
     }
   }
 
-  ini = result;
-
+error_exit:;
   fclose(fp);
 
-  return return_val;
+  if (return_val < 0) {
+    sbini_free(ini);
+  }
+
+  return ini;
 }
 
 /* GETTERS */
@@ -501,8 +505,8 @@ sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group_name, c
         }
 
         item = item->next;
-        return NULL; // not in group, return
       }
+      return NULL; // not in group, return
     }
 
     group = group->next;
@@ -511,7 +515,7 @@ sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group_name, c
   return NULL; // no such group;
 }
 
-sbini_item_t *sbin__internal_find_item_in_group (sbini_group_t *group, const char *key)
+sbini_item_t *sbini__internal_find_item_in_group (sbini_group_t *group, const char *key)
 {
   sbini_item_t *item;
 
@@ -532,7 +536,7 @@ sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const ch
 {
   sbini_item_t *item;
 
-  item = sbin__internal_find_item_in_group(group, key);
+  item = sbini__internal_find_item_in_group(group, key);
 
   if (!item) {
     item = sbini__internal_add_item(group, key, value, str_value);

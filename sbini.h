@@ -45,7 +45,8 @@ typedef struct
 extern "C" {
 #endif
 
-int sbini_load (const char *file_path, sbini_t *ini);
+sbini_t *sbini_new (void);
+sbini_t *sbini_load (const char *file_path);
 int sbini_save (sbini_t *ini, const char *file_path);
 void sbini_free (sbini_t *ini);
 
