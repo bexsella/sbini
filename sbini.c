@@ -31,6 +31,7 @@
 #endif
 
 /** INTERNAL FUNCTION DECLERATIONS **/
+void sbini__internal_check_mem_funcs (void);
 sbini_t *sbini__internal_create_ini (void);
 sbini_group_t *sbini__internal_add_group (sbini_t *ini, const char *name);
 sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name);
@@ -40,10 +41,26 @@ sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group, const 
 sbini_item_t *sbini__internal_find_item_in_group (sbini_group_t *group, const char *key);
 sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const char *key, const char *value, const int str_value);
 
+sbini_malloc_func_t sbini_malloc_func = NULL;
+sbini_free_func_t sbini_free_func = NULL;
+
+int sbini_register_mem_funcs (sbini_malloc_func_t malloc_func, sbini_free_func_t free_func)
+{
+  if (!malloc_func || !free_func) {
+    return -1;
+  }
+
+  sbini_malloc_func = malloc_func;
+  sbini_free_func = free_func;
+
+  return 0;
+}
+
 /** PUBLIC FUNCTION DEFINITIONS **/
 
 sbini_t *sbini_new (void)
 {
+  sbini__internal_check_mem_funcs();
   return sbini__internal_create_ini();
 }
 
@@ -57,6 +74,8 @@ sbini_t *sbini_load (const char *file_path)
   sbini_t *ini;
   sbini_group_t *current_group = NULL;
   sbini_item_t *current_item = NULL;
+
+  sbini__internal_check_mem_funcs();
 
   fp = fopen(file_path, "r");
 
@@ -72,9 +91,11 @@ sbini_t *sbini_load (const char *file_path)
   }
 
   while (fgets(line_buffer, SBINI_MAX_LINE_LENGTH, fp) != NULL) {
-    if (line_buffer[0] != '#' && line_buffer[0] != '\n') {
-      line = &line_buffer[0];
+    line = &line_buffer[0];
 
+    SBINI_SKIP_WHITESPACE(line);
+
+    if (*line != '#' && *line != '\n') {
       if (*line == '[') {
         line++;
         str = line;
@@ -359,12 +380,12 @@ void sbini_free (sbini_t *ini)
     while (item) {
       tmp_item = item;
       item = item->next;
-      free(tmp_item);
+      sbini_free_func(tmp_item);
     }
 
     tmp_group = group;
     group = group->next;
-    free(tmp_group);
+    sbini_free_func(tmp_group);
   }
 }
 
@@ -372,11 +393,19 @@ void sbini_free (sbini_t *ini)
 /******************* INTERNAL FUNCTION DEFINITIONS *******************/
 /*********************************************************************/
 
+void sbini__internal_check_mem_funcs (void)
+{
+  if (!sbini_malloc_func && !sbini_free_func) {
+    sbini_malloc_func = malloc;
+    sbini_free_func = free;
+  }
+}
+
 sbini_t *sbini__internal_create_ini (void)
 {
   sbini_t *ini;
 
-  ini = (sbini_t*)malloc(sizeof(sbini_t));
+  ini = (sbini_t*)sbini_malloc_func(sizeof(sbini_t));
 
   if (!ini) {
     return NULL;
@@ -392,7 +421,7 @@ sbini_group_t *sbini__internal_add_group (sbini_t *ini, const char *name)
 {
   sbini_group_t *group, *search;
 
-  group = (sbini_group_t*)malloc(sizeof(sbini_group_t));
+  group = (sbini_group_t*)sbini_malloc_func(sizeof(sbini_group_t));
 
   if (!group) {
     return NULL;
@@ -458,7 +487,7 @@ sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, c
 {
   sbini_item_t *item, *search;
 
-  item = (sbini_item_t*)malloc(sizeof(sbini_item_t));
+  item = (sbini_item_t*)sbini_malloc_func(sizeof(sbini_item_t));
 
   if (!item) {
     return NULL;

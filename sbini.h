@@ -41,6 +41,9 @@ typedef struct
   int group_count;
 } sbini_t;
 
+typedef void*(*sbini_malloc_func_t)(size_t);
+typedef void (*sbini_free_func_t)(void *);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,6 +62,8 @@ int sbini_set_float (sbini_t *ini, const char *group_name, const char *key, cons
 int sbini_set_boolean (sbini_t *ini, const char *group_name, const char *key, const int value);
 int sbini_set_int (sbini_t *ini, const char *group_name, const char *key, const int value);
 int sbini_set_string (sbini_t *ini, const char *group_name, const char *key, const char *value);
+
+int sbini_register_mem_funcs (sbini_malloc_func_t malloc_func, sbini_free_func_t free_func);
 
 #ifdef __cplusplus
 }
