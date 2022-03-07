@@ -12,52 +12,6 @@
 extern "C" {
 #endif
 
-typedef struct sbini_t sbini_t;
-typedef struct sbini_group_t sbini_group_t;
-typedef struct sbini_item_t sbini_item_t;
-
-sbini_t *sbini_new (void);
-sbini_t *sbini_load (const char *file_path);
-int sbini_save (sbini_t *ini, const char *file_path);
-void sbini_free (sbini_t *ini);
-
-int sbini_get_int (sbini_t *ini, const char *group_name, const char *key);
-float sbini_get_float (sbini_t *ini, const char *group_name, const char *key);
-const char *sbini_get_string (sbini_t *ini, const char *group_name, const char *key);
-int sbini_get_boolean (sbini_t *ini, const char *group_name, const char *key);
-
-int sbini_set_float (sbini_t *ini, const char *group_name, const char *key, const float value);
-int sbini_set_boolean (sbini_t *ini, const char *group_name, const char *key, const int value);
-int sbini_set_int (sbini_t *ini, const char *group_name, const char *key, const int value);
-int sbini_set_string (sbini_t *ini, const char *group_name, const char *key, const char *value);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // _SBINI_H_
-
-#ifdef SBINI_IMPLEMENTATION
-
-/** USEFUL MACROS **/
-#define SBINI_IS_WHITESPACE(c) (c == ' ' || c == '\t')
-#define SBINI_SKIP_WHITESPACE(cp) while (cp && SBINI_IS_WHITESPACE(*cp)) cp++
-#define SBINI_SEEK_CHAR(cp,c) while (cp && *cp != c) cp++
-#define SBINI_SEEK_CHAR_AND_WHITESPACE(cp,wsp,c) while (cp && *cp != c) { \
-                                                  if (!wsp && SBINI_IS_WHITESPACE(*cp)) { \
-                                                    wsp = cp; \
-                                                  } else if (wsp && !SBINI_IS_WHITESPACE(*cp)) { \
-                                                    wsp = NULL; \
-                                                  } \
-                                                  cp++; \
-                                                }
-
-#define SBINI_BOOLEAN_STRING(b) (b ? "true":"false")
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #ifndef SBINI_MAX_KEY_VALUE_LENGTH
 #define SBINI_MAX_KEY_VALUE_LENGTH 256
 #endif
@@ -66,11 +20,6 @@ int sbini_set_string (sbini_t *ini, const char *group_name, const char *key, con
 #define SBINI_MAX_LINE_LENGTH 1024
 #endif
 
-#if defined(SBINI_MALLOC) && defined(SBINI_FREE)
-#elif !defined(SBINI_MALLOC) && !defined(SBINI_FREE)
-#else
-#error "Must define none or both of SBINI_MALLOC and SBINI_FREE"
-#endif
 
 typedef struct sbini_item_t
 {
@@ -97,6 +46,55 @@ typedef struct sbini_t
   int group_count;
 } sbini_t;
 
+sbini_t *sbini_new (void);
+sbini_t *sbini_load (const char *file_path);
+int sbini_save (sbini_t *ini, const char *file_path);
+void sbini_free (sbini_t *ini);
+
+int sbini_get_int (const sbini_t *ini, const char *group_name, const char *key, int *value);
+int sbini_get_float (const sbini_t *ini, const char *group_name, const char *key, float *value);
+int sbini_get_string (const sbini_t *ini, const char *group_name, const char *key, char *value, const size_t buffer_length);
+int sbini_get_boolean (const sbini_t *ini, const char *group_name, const char *key, int *value);
+
+int sbini_set_float (sbini_t *ini, const char *group_name, const char *key, const float value);
+int sbini_set_boolean (sbini_t *ini, const char *group_name, const char *key, const int value);
+int sbini_set_int (sbini_t *ini, const char *group_name, const char *key, const int value);
+int sbini_set_string (sbini_t *ini, const char *group_name, const char *key, const char *value);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // _SBINI_H_
+
+#ifdef SBINI_IMPLEMENTATION
+#define _CRT_SECURE_NO_WARNINGS
+
+/** USEFUL MACROS **/
+#define SBINI_IS_WHITESPACE(c) (c == ' ' || c == '\t')
+#define SBINI_SKIP_WHITESPACE(cp) while (cp && SBINI_IS_WHITESPACE(*cp)) cp++
+#define SBINI_SEEK_CHAR(cp,c) while (cp && *cp != c) cp++
+#define SBINI_SEEK_CHAR_AND_WHITESPACE(cp,wsp,c) while (cp && *cp != c) { \
+                                                  if (!wsp && SBINI_IS_WHITESPACE(*cp)) { \
+                                                    wsp = cp; \
+                                                  } else if (wsp && !SBINI_IS_WHITESPACE(*cp)) { \
+                                                    wsp = NULL; \
+                                                  } \
+                                                  cp++; \
+                                                }
+
+#define SBINI_BOOLEAN_STRING(b) (b ? "true":"false")
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#if defined(SBINI_MALLOC) && defined(SBINI_FREE)
+#elif !defined(SBINI_MALLOC) && !defined(SBINI_FREE)
+#else
+#error "Must define none or both of SBINI_MALLOC and SBINI_FREE"
+#endif
+
 #if !defined (SBINI_MALLOC) && !defined(SBINI_FREE)
 #define SBINI_MALLOC(size) malloc(size)
 #define SBINI_FREE(ptr) free(ptr)
@@ -109,11 +107,11 @@ typedef struct sbini_t
 /** INTERNAL FUNCTION DECLERATIONS **/
 sbini_t *sbini__internal_create_ini (void);
 sbini_group_t *sbini__internal_add_group (sbini_t *ini, const char *name);
-sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name);
+sbini_group_t *sbini__internal_find_group (const sbini_t *ini, const char *name);
 sbini_group_t *sbini__internal_find_or_add_group (sbini_t *ini, const char *name);
 sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, const char *value, const int string_val);
-sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group, const char *key);
-sbini_item_t *sbini__internal_find_item_in_group (sbini_group_t *group, const char *key);
+sbini_item_t *sbini__internal_find_item (const sbini_t *ini, const char *group, const char *key);
+sbini_item_t *sbini__internal_find_item_in_group (const sbini_group_t *group, const char *key);
 sbini_item_t *sbini__internal_modify_or_add_item (sbini_group_t *group, const char *key, const char *value, const int str_value);
 
 /*********************************************************************/
@@ -233,6 +231,7 @@ error_exit:;
 
   if (return_val < 0) {
     sbini_free(ini);
+    ini = NULL;
   }
 
   return ini;
@@ -240,43 +239,46 @@ error_exit:;
 
 /* GETTERS */
 
-int sbini_get_int (sbini_t *ini, const char *group_name, const char *key) {
+int sbini_get_int (const sbini_t *ini, const char *group_name, const char *key, int *value) {
   sbini_item_t *item;
 
   item = sbini__internal_find_item(ini, group_name, key);
 
   if (!item) {
-    return 0;
+    return -1;
   }
 
-  return atoi(item->value);
+  *value = atoi(item->value);
+  return 0;
 }
 
-float sbini_get_float (sbini_t *ini, const char *group_name, const char *key) {
+int sbini_get_float (const sbini_t *ini, const char *group_name, const char *key, float *value) {
   sbini_item_t *item;
 
   item = sbini__internal_find_item(ini, group_name, key);
 
   if (!item) {
-    return 0;
+    return -1;
   }
 
-  return (float)atof(item->value);
+  *value = (float) atof(item->value);
+  return 0;
 }
 
-const char *sbini_get_string (sbini_t *ini, const char *group_name, const char *key) {
+int sbini_get_string (const sbini_t *ini, const char *group_name, const char *key, char *buffer, const size_t buffer_length) {
   sbini_item_t *item;
 
   item = sbini__internal_find_item(ini, group_name, key);
 
   if (!item) {
-    return 0;
+    return -1;
   }
 
-  return item->value;
+  strncpy(buffer, item->value, buffer_length);
+  return 0;
 }
 
-int sbini_get_boolean (sbini_t *ini, const char *group_name, const char *key) {
+int sbini_get_boolean (const sbini_t *ini, const char *group_name, const char *key, int *value) {
   sbini_item_t *item;
 
   item = sbini__internal_find_item(ini, group_name, key);
@@ -285,7 +287,8 @@ int sbini_get_boolean (sbini_t *ini, const char *group_name, const char *key) {
     return 0;
   }
 
-  return (strncasecmp(item->value, "true", 4) == 0);
+  *value = (strncasecmp(item->value, "true", 4) == 0);
+  return 1;
 }
 
 /* SETTERS */
@@ -486,7 +489,7 @@ sbini_group_t *sbini__internal_add_group (sbini_t *ini, const char *name) {
   return group;
 }
 
-sbini_group_t *sbini__internal_find_group (sbini_t *ini, const char *name) {
+sbini_group_t *sbini__internal_find_group (const sbini_t *ini, const char *name) {
   sbini_group_t *group;
 
   group = ini->head;
@@ -551,7 +554,7 @@ sbini_item_t *sbini__internal_add_item (sbini_group_t *group, const char *key, c
   return item;
 }
 
-sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group_name, const char *key) {
+sbini_item_t *sbini__internal_find_item (const sbini_t *ini, const char *group_name, const char *key) {
   sbini_item_t *item;
   sbini_group_t *group;
 
@@ -577,7 +580,7 @@ sbini_item_t *sbini__internal_find_item (sbini_t *ini, const char *group_name, c
   return NULL; // no such group;
 }
 
-sbini_item_t *sbini__internal_find_item_in_group (sbini_group_t *group, const char *key) {
+sbini_item_t *sbini__internal_find_item_in_group (const sbini_group_t *group, const char *key) {
   sbini_item_t *item;
 
   item = group->head;
